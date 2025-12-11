@@ -1,0 +1,17 @@
+[package]
+name = "scg-kernel"
+version = "0.1.0"
+edition = "2021"
+description = "Zero-Drift Numerical Kernel - C FFI for Game Engines"
+authors = ["Armonti Du-Bose-Hill <armonti@onlysg.solutions>"]
+license = "Apache-2.0"
+readme = "README.md"
+keywords = ["physics", "deterministic", "neumaier", "ffi", "game-engine"]
+categories = ["mathematics", "simulation", "game-engines"]
+
+[lib]
+name = "scg_kernel"
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[dependencies]
+# No dependencies - pure Rust implementation for maximum portability
