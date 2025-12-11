@@ -320,11 +320,7 @@ mod tests {
         acc.add(-1e16);
 
         let result = acc.total();
-        assert!(
-            (result - 1.0).abs() < 1e-10,
-            "Expected 1.0, got {}",
-            result
-        );
+        assert!((result - 1.0).abs() < 1e-10, "Expected 1.0, got {}", result);
 
         // Compare to naive sum (would lose the 1.0)
         let naive = 1e16_f64 + 1.0 + (-1e16_f64);
@@ -350,11 +346,7 @@ mod tests {
         }
 
         let drift = acc.drift();
-        assert!(
-            drift.abs() < 1e-10,
-            "Drift should be ~0, got {}",
-            drift
-        );
+        assert!(drift.abs() < 1e-10, "Drift should be ~0, got {}", drift);
     }
 
     #[test]
