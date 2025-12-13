@@ -2,6 +2,15 @@
 
 **Drop-in drift-free accumulation for game engines and physics simulations.**
 
+## ABI Stability
+
+Drift Kernel exposes a stable C ABI intended for long-term integration.
+Public ABI symbols are versioned and governed; they will not be renamed
+or removed without a major version increment.
+
+Rust crate names, internal modules, and implementation details may evolve
+without ABI impact.
+
 ## The Problem
 
 Standard floating-point accumulation drifts over time:
