@@ -31,6 +31,17 @@ A governed execution contract provides:
 
 [Iter](https://github.com/aduboseh/iter) is a reference runtime that implements a governed execution contract.
 
+## Non-Goals
+
+Drift Kernel will **never** provide:
+- Scheduling, timing, or frame management
+- Synchronization or threading primitives
+- Replay, rollback, or state snapshots
+- Input handling or event ordering
+- Network communication
+
+These are runtime concerns. The kernel is a numerical primitive only.
+
 ## The Problem
 
 Standard floating-point accumulation drifts over time:
