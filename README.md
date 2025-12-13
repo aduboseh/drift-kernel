@@ -22,6 +22,15 @@ responsibility of the integrating runtime.
 Without a governed execution model, numerical stability alone is insufficient to
 guarantee deterministic simulations across frames, clients, or replays.
 
+A governed execution contract provides:
+- **Deterministic tick/frame ordering** — operations execute in the same sequence every run
+- **Input sequencing** — inputs are applied in a canonical order
+- **Stable frame boundaries** — tick boundaries are well-defined and consistent
+- **Cross-client synchronization** — all clients agree on execution order
+- **Replay semantics** — identical inputs produce identical outputs
+
+[Iter](https://github.com/aduboseh/iter) is a reference runtime that implements a governed execution contract.
+
 ## The Problem
 
 Standard floating-point accumulation drifts over time:
