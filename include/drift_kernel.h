@@ -1,12 +1,12 @@
 /**
- * SCG Kernel - Zero-Drift Numerical Primitives
+ * Drift Kernel - Zero-Drift Numerical Primitives
  * 
  * A minimal C API for Neumaier-compensated summation.
  * Drop-in replacement for floating-point accumulation in physics engines.
  * 
  * Machine Precision Guarantee:
  *   Standard floating-point: O(n × ε) drift (accumulates)
- *   SCG Kernel (Neumaier):   O(ε) drift (bounded)
+ *   Drift Kernel (Neumaier): O(ε) drift (bounded)
  * 
  * Example:
  *   ScgAccumulator* acc = scg_accumulator_new(1000000.0);
@@ -19,22 +19,22 @@
  *   scg_accumulator_free(acc);
  * 
  * License: Apache-2.0
- * Copyright (c) 2025 SCG Project
+ * Copyright (c) 2025 Drift Kernel Project
  */
 
-#ifndef SCG_KERNEL_H
-#define SCG_KERNEL_H
+#ifndef DRIFT_KERNEL_H
+#define DRIFT_KERNEL_H
 
 #include <stdint.h>
 #include <stddef.h>
 
-#ifndef SCG_KERNEL_ABI_VERSION
-#define SCG_KERNEL_ABI_VERSION 1
+#ifndef DRIFT_KERNEL_ABI_VERSION
+#define DRIFT_KERNEL_ABI_VERSION 1
 #endif
 
-#define SCG_KERNEL_ABI_VERSION_MAJOR 1
-#define SCG_KERNEL_ABI_VERSION_MINOR 0
-#define SCG_KERNEL_ABI_VERSION_PATCH 0
+#define DRIFT_KERNEL_ABI_VERSION_MAJOR 1
+#define DRIFT_KERNEL_ABI_VERSION_MINOR 0
+#define DRIFT_KERNEL_ABI_VERSION_PATCH 0
 
 #ifdef __cplusplus
 extern "C" {
@@ -110,7 +110,7 @@ double scg_accumulator_raw_sum(const ScgAccumulator* acc);
 /**
  * Get the compensation buffer value.
  * 
- * This is the "hidden correction term" that makes SCG physics.
+ * This is the "hidden correction term" that makes drift-free accumulation possible.
  * Exposing it proves the algorithm is working, not smoothing.
  * 
  * @param acc  Accumulator (must not be NULL)
@@ -174,4 +174,4 @@ double scg_machine_epsilon(void);
 }
 #endif
 
-#endif /* SCG_KERNEL_H */
+#endif /* DRIFT_KERNEL_H */

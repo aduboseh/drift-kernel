@@ -1,5 +1,5 @@
 [package]
-name = "scg-kernel"
+name = "drift-kernel"
 version = "0.1.0"
 edition = "2021"
 description = "Zero-Drift Numerical Kernel - C FFI for Game Engines"
@@ -10,7 +10,7 @@ keywords = ["physics", "deterministic", "neumaier", "ffi", "game-engine"]
 categories = ["mathematics", "simulation", "game-engines"]
 
 [lib]
-name = "scg_kernel"
+name = "drift_kernel"
 crate-type = ["cdylib", "staticlib", "rlib"]
 
 [dependencies]

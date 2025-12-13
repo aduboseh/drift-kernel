@@ -1,4 +1,4 @@
-//! SCG Kernel - Zero-Drift Numerical Primitives
+//! Drift Kernel - Zero-Drift Numerical Primitives
 //!
 //! A minimal, dependency-free C-FFI library exposing Neumaier-compensated
 //! summation for game engines and physics simulations.
@@ -6,12 +6,12 @@
 //! # Machine Precision Guarantee
 //!
 //! Standard floating-point accumulation: O(n × ε_machine) drift
-//! SCG Kernel (Neumaier): O(ε_machine) bounded, non-accumulating
+//! Drift Kernel (Neumaier): O(ε_machine) bounded, non-accumulating
 //!
 //! # C Integration
 //!
 //! ```c
-//! #include "scg_kernel.h"
+//! #include "drift_kernel.h"
 //!
 //! ScgAccumulator* acc = scg_accumulator_new(1000000.0);
 //! for (int i = 0; i < 100000; i++) {
@@ -100,7 +100,7 @@ impl ScgAccumulator {
 
     /// Get the compensation buffer value
     ///
-    /// This is the "hidden correction term" that makes SCG physics.
+    /// This is the "hidden correction term" that makes drift-free accumulation possible.
     /// Exposing it proves the algorithm is working, not smoothing.
     #[inline]
     pub fn compensation(&self) -> f64 {
