@@ -28,6 +28,14 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#ifndef SCG_KERNEL_ABI_VERSION
+#define SCG_KERNEL_ABI_VERSION 1
+#endif
+
+#define SCG_KERNEL_ABI_VERSION_MAJOR 1
+#define SCG_KERNEL_ABI_VERSION_MINOR 0
+#define SCG_KERNEL_ABI_VERSION_PATCH 0
+
 #ifdef __cplusplus
 extern "C" {
 #endif
