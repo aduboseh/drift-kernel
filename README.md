@@ -1,6 +1,6 @@
 # Drift Kernel - Zero-Drift Numerical Primitives
 
-**Drop-in drift-free accumulation for game engines and physics simulations.**
+**Deterministic accumulation primitive for governed execution environments.**
 
 ## ABI Stability
 
@@ -10,6 +10,17 @@ or removed without a major version increment.
 
 Rust crate names, internal modules, and implementation details may evolve
 without ABI impact.
+
+## Execution Contract
+
+Drift Kernel guarantees numerical stability **given a deterministic execution order**.
+
+The kernel does not define, enforce, or manage execution ordering, input sequencing,
+frame boundaries, synchronization, or replay semantics. These concerns are the
+responsibility of the integrating runtime.
+
+Without a governed execution model, numerical stability alone is insufficient to
+guarantee deterministic simulations across frames, clients, or replays.
 
 ## The Problem
 

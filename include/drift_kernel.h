@@ -2,7 +2,14 @@
  * Drift Kernel - Zero-Drift Numerical Primitives
  * 
  * A minimal C API for Neumaier-compensated summation.
- * Drop-in replacement for floating-point accumulation in physics engines.
+ * Deterministic accumulation primitive for governed execution environments.
+ *
+ * EXECUTION CONTRACT:
+ * Drift Kernel provides numerical accumulation primitives with bounded drift.
+ * Correctness guarantees assume a deterministic execution order.
+ * This library does not provide scheduling, timing, synchronization,
+ * input ordering, or replay mechanisms.
+ * Integrators are responsible for enforcing a stable execution contract.
  * 
  * Machine Precision Guarantee:
  *   Standard floating-point: O(n × ε) drift (accumulates)
