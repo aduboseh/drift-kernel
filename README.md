@@ -132,6 +132,8 @@ cargo build --release
 # target/release/libdrift_kernel.a     (Linux static)
 ```
 
+Note: `Cargo.lock` is intentionally not committed (this is a library crate).
+
 ## Why This Works
 
 The Neumaier algorithm tracks floating-point error in a compensation buffer:
