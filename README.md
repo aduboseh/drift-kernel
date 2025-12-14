@@ -13,7 +13,7 @@ without ABI impact.
 
 ## Execution Contract
 
-Drift Kernel guarantees numerical stability **given a deterministic execution order**.
+Drift Kernel guarantees numerical stability given a deterministic execution order.
 
 The kernel does not define, enforce, or manage execution ordering, input sequencing,
 frame boundaries, synchronization, or replay semantics. These concerns are the
