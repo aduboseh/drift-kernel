@@ -1,6 +1,32 @@
-# Drift Kernel - Zero-Drift Numerical Primitives
+# Drift Kernel — Bounded-Error Numerical Primitives
 
-**Deterministic accumulation primitive for governed execution environments.**
+**Compensated summation primitive with stable C ABI.**
+
+[![CI](https://github.com/aduboseh/drift-kernel/actions/workflows/ci.yml/badge.svg)](https://github.com/aduboseh/drift-kernel/actions/workflows/ci.yml)
+
+**Validation:** Tested across Linux/Windows/macOS with property-based tests, 1M-operation stress tests, ABI symbol verification, and C FFI harness. See [docs/VALIDATION.md](docs/VALIDATION.md).
+
+> **Note on Terminology:**
+> Earlier drafts used imprecise language around "zero drift." This has been corrected to reflect bounded, provable error behavior under IEEE-754. See [Guarantees](#guarantees) for precise statements.
+
+## Guarantees
+
+### We guarantee (for Drift Kernel–scoped operations only):
+- **Bounded numerical error:** O(ε) error growth vs. O(n × ε) for naive summation, under IEEE-754 binary64.
+- **Stable ABI:** Exported C functions behave per specification; no breaking changes without major version bump.
+- **Deterministic replay:** Identical results within controlled environments (same compiler, target, rounding mode, operation ordering).
+
+### We do NOT guarantee:
+- **Platform-independent bit-for-bit determinism** across uncontrolled environments (different compilers, architectures, or rounding modes).
+- **Literal "zero error"** — impossible under IEEE-754 floating-point arithmetic.
+- **Global simulation determinism** — that is the responsibility of the integrating runtime, not this primitive.
+
+### You must control:
+- Compiler/toolchain version and optimization flags
+- Target architecture (x86-64, ARM64, etc.)
+- Floating-point rounding mode (if non-default)
+- Operation ordering and input sequencing
+- Host runtime determinism (thread scheduling, memory allocators, etc.)
 
 ## ABI Stability
 
@@ -44,7 +70,7 @@ These are runtime concerns. The kernel is a numerical primitive only.
 
 ## The Problem
 
-Standard floating-point accumulation drifts over time:
+Standard floating-point accumulation exhibits unbounded error growth:
 
 ```cpp
 double energy = 1000000.0;
@@ -53,7 +79,7 @@ for (int i = 0; i < 100000; i++) {
     energy -= 1e15;
 }
 // Expected: 1000000.0
-// Actual:   1000001.54... (DRIFTED)
+// Actual:   1000001.54... (error accumulated)
 ```
 
 This causes:
@@ -63,7 +89,7 @@ This causes:
 
 ## The Solution
 
-Drift Kernel uses Neumaier-compensated summation:
+Drift Kernel uses Neumaier-compensated summation to bound error growth:
 
 ```cpp
 #include "drift_kernel.h"
@@ -74,17 +100,16 @@ for (int i = 0; i < 100000; i++) {
     scg_accumulator_add(acc, -1e15);
 }
 double result = scg_accumulator_total(acc);
-// result == 1000000.0 (EXACT)
+// result == 1000000.0 (bounded error, not accumulated)
 scg_accumulator_free(acc);
 ```
 
-## Performance
+## Error Bounds
 
-| Metric | Standard | Drift Kernel |
-|--------|----------|------------|
-| Drift after 100k ops | ~1.5e-3 | 0.0 |
-| Error growth | O(n × ε) | O(ε) |
-| Overhead | - | ~2 extra ops |
+- **Standard accumulation:** Error grows as O(n × ε) where n = operation count, ε = machine epsilon (~2.22e-16)
+- **Neumaier (this library):** Error bounded at O(ε) regardless of operation count
+
+This is a mathematical property of the algorithm, not a performance claim. See `cargo bench` for actual timing measurements on your hardware.
 
 ## API Reference
 
@@ -116,7 +141,7 @@ double scg_neumaier_sum(const double* values, size_t len);
 ### Metadata
 
 ```c
-const char* scg_kernel_version(void);  // "0.1.0"
+const char* scg_kernel_version(void);  // "1.0.0"
 double scg_machine_epsilon(void);       // ~2.22e-16
 ```
 
@@ -187,7 +212,7 @@ For each addition:
     compensation += (value - temp) + sum  // Lost from value
   sum = temp
 
-Result = sum + compensation  // Exact to machine precision
+Result = sum + compensation  // Bounded to machine precision
 ```
 
 This bounds error to O(ε) regardless of operation count, while standard accumulation grows as O(n × ε).
@@ -198,7 +223,10 @@ Run the test suite:
 
 ```bash
 cargo test
+cargo bench  # Performance measurements
 ```
+
+See [docs/VALIDATION.md](docs/VALIDATION.md) for detailed coverage information.
 
 ## License
 

@@ -1,8 +1,8 @@
 [package]
 name = "drift-kernel"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
-description = "Zero-Drift Numerical Kernel - C FFI for Game Engines"
+description = "Bounded-Error Numerical Primitives - Neumaier-compensated summation with C FFI"
 authors = ["Armonti Du-Bose-Hill <armonti@onlysg.solutions>"]
 license = "Apache-2.0"
 readme = "README.md"
@@ -14,4 +14,12 @@ name = "drift_kernel"
 crate-type = ["cdylib", "staticlib", "rlib"]
 
 [dependencies]
-# No dependencies - pure Rust implementation for maximum portability
+# No runtime dependencies - pure Rust implementation for maximum portability
+
+[dev-dependencies]
+proptest = "1.4"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "accumulator"
+harness = false

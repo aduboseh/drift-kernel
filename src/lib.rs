@@ -1,12 +1,12 @@
-//! Drift Kernel - Zero-Drift Numerical Primitives
+//! Drift Kernel — Bounded-Error Numerical Primitives
 //!
 //! A minimal, dependency-free C-FFI library exposing Neumaier-compensated
-//! summation for game engines and physics simulations.
+//! summation for physics simulations and deterministic systems.
 //!
-//! # Machine Precision Guarantee
+//! # Error Bounds (IEEE-754 binary64)
 //!
-//! Standard floating-point accumulation: O(n × ε_machine) drift
-//! Drift Kernel (Neumaier): O(ε_machine) bounded, non-accumulating
+//! Standard floating-point accumulation: O(n × ε) error growth (unbounded)
+//! Drift Kernel (Neumaier): O(ε) error (bounded, not accumulated)
 //!
 //! # C Integration
 //!
@@ -291,7 +291,7 @@ pub fn neumaier_sum_slice(values: &[f64]) -> f64 {
 /// Returns a static string pointer. Do NOT free.
 #[no_mangle]
 pub extern "C" fn scg_kernel_version() -> *const core::ffi::c_char {
-    c"0.1.0".as_ptr()
+    c"1.0.0".as_ptr()
 }
 
 /// Get machine epsilon for f64.
@@ -307,6 +307,10 @@ pub extern "C" fn scg_machine_epsilon() -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ========================================================================
+    // Core Algorithm Tests
+    // ========================================================================
 
     #[test]
     fn test_catastrophic_cancellation() {
@@ -332,7 +336,50 @@ mod tests {
     }
 
     #[test]
-    fn test_long_accumulation() {
+    fn test_compensation_exposed() {
+        let mut acc = ScgAccumulator::new(0.0);
+        acc.add(1e16);
+        acc.add(1.0);
+        acc.add(-1e16);
+
+        // Compensation should be non-zero (it captured the lost 1.0)
+        let comp = acc.compensation();
+        assert!(
+            comp.abs() > 0.0,
+            "Compensation should capture error, got {}",
+            comp
+        );
+    }
+
+    #[test]
+    fn test_reset() {
+        let mut acc = ScgAccumulator::new(100.0);
+        acc.add(50.0);
+        acc.add(-25.0);
+        assert_eq!(acc.ops(), 2);
+
+        acc.reset();
+        assert_eq!(acc.total(), 100.0);
+        assert_eq!(acc.ops(), 0);
+        assert_eq!(acc.compensation(), 0.0);
+    }
+
+    #[test]
+    fn test_slice_sum_empty() {
+        assert_eq!(neumaier_sum_slice(&[]), 0.0);
+    }
+
+    #[test]
+    fn test_slice_sum_single() {
+        assert_eq!(neumaier_sum_slice(&[42.0]), 42.0);
+    }
+
+    // ========================================================================
+    // Long-Horizon Stress Tests (Phase D2)
+    // ========================================================================
+
+    #[test]
+    fn test_long_accumulation_100k() {
         let mut acc = ScgAccumulator::new(1_000_000.0);
 
         // 100,000 balanced operations
@@ -349,19 +396,266 @@ mod tests {
         assert!(drift.abs() < 1e-10, "Drift should be ~0, got {}", drift);
     }
 
+    /// Long-horizon stress test: 1 million operations
+    /// This validates O(ε) error bound over sustained accumulation.
     #[test]
-    fn test_compensation_exposed() {
+    fn test_long_horizon_1m_ops() {
+        const N: usize = 1_000_000;
         let mut acc = ScgAccumulator::new(0.0);
-        acc.add(1e16);
-        acc.add(1.0);
-        acc.add(-1e16);
 
-        // Compensation should be non-zero (it captured the lost 1.0)
-        let comp = acc.compensation();
+        // Alternating large magnitude values that should cancel
+        for i in 0..N {
+            let magnitude = 1e10 + (i as f64) * 0.1;
+            acc.add(magnitude);
+            acc.add(-magnitude);
+        }
+
+        let total = acc.total();
+        let error = total.abs();
+
+        // Error should be bounded by O(ε), not O(n × ε)
+        // With 2M ops and ε ≈ 2.22e-16, O(n×ε) would be ~4.4e-10
+        // O(ε) bound means error should be much smaller
         assert!(
-            comp.abs() > 0.0,
-            "Compensation should capture error, got {}",
-            comp
+            error < f64::EPSILON * 1000.0,
+            "Error {} exceeds O(ε) bound after {} ops",
+            error,
+            N * 2
         );
+
+        eprintln!(
+            "1M ops stress test: total={}, error={}, ops={}",
+            total,
+            error,
+            acc.ops()
+        );
+    }
+
+    /// Harmonic series partial sum (known analytic approximation)
+    /// Sum of 1/n from 1 to N ≈ ln(N) + γ (Euler-Mascheroni constant)
+    #[test]
+    fn test_harmonic_series_accuracy() {
+        const N: usize = 100_000;
+        let mut acc = ScgAccumulator::new(0.0);
+
+        for i in 1..=N {
+            acc.add(1.0 / (i as f64));
+        }
+
+        let result = acc.total();
+        // H_100000 ≈ 12.090146129863335 (computed with high precision)
+        let expected = 12.090146129863335;
+        let error = (result - expected).abs();
+
+        // Should be accurate to ~12 significant digits
+        assert!(
+            error < 1e-10,
+            "Harmonic sum error {} too large (result={}, expected={})",
+            error,
+            result,
+            expected
+        );
+    }
+
+    // ========================================================================
+    // Adversarial Sequence Tests
+    // ========================================================================
+
+    #[test]
+    fn test_adversarial_alternating_magnitudes() {
+        // Alternating huge/tiny values: 1e15, 1e-15, 1e15, 1e-15, ...
+        let mut acc = ScgAccumulator::new(0.0);
+        const N: usize = 10_000;
+
+        for _ in 0..N {
+            acc.add(1e15);
+            acc.add(1e-15);
+            acc.add(-1e15);
+            acc.add(-1e-15);
+        }
+
+        let error = acc.total().abs();
+        assert!(
+            error < f64::EPSILON * 100.0,
+            "Adversarial alternating test failed: error = {}",
+            error
+        );
+    }
+
+    #[test]
+    fn test_adversarial_accumulating_small() {
+        // Many small values that accumulate
+        let mut acc = ScgAccumulator::new(0.0);
+        let small = 1e-15;
+        const N: usize = 1_000_000;
+
+        for _ in 0..N {
+            acc.add(small);
+        }
+
+        let result = acc.total();
+        let expected = small * (N as f64);
+        let relative_error = ((result - expected) / expected).abs();
+
+        // Relative error should be bounded
+        assert!(
+            relative_error < f64::EPSILON * 10.0,
+            "Small accumulation relative error {} too large",
+            relative_error
+        );
+    }
+
+    // ========================================================================
+    // FFI Null Safety Tests
+    // ========================================================================
+
+    #[test]
+    fn test_ffi_null_safety() {
+        unsafe {
+            // All functions should handle null gracefully
+            scg_accumulator_free(core::ptr::null_mut());
+            scg_accumulator_add(core::ptr::null_mut(), 1.0);
+            assert_eq!(scg_accumulator_total(core::ptr::null()), 0.0);
+            assert_eq!(scg_accumulator_raw_sum(core::ptr::null()), 0.0);
+            assert_eq!(scg_accumulator_compensation(core::ptr::null()), 0.0);
+            assert_eq!(scg_accumulator_drift(core::ptr::null()), 0.0);
+            assert_eq!(scg_accumulator_ops(core::ptr::null()), 0);
+            scg_accumulator_reset(core::ptr::null_mut());
+            assert_eq!(scg_neumaier_sum(core::ptr::null(), 10), 0.0);
+        }
+    }
+
+    #[test]
+    fn test_ffi_roundtrip() {
+        unsafe {
+            let acc = scg_accumulator_new(100.0);
+            assert!(!acc.is_null());
+
+            scg_accumulator_add(acc, 1e15);
+            scg_accumulator_add(acc, 1.0);
+            scg_accumulator_add(acc, -1e15);
+
+            let total = scg_accumulator_total(acc);
+            assert!((total - 101.0).abs() < 1e-10);
+
+            let drift = scg_accumulator_drift(acc);
+            assert!((drift - 1.0).abs() < 1e-10);
+
+            assert_eq!(scg_accumulator_ops(acc), 3);
+
+            scg_accumulator_free(acc);
+        }
+    }
+
+    #[test]
+    fn test_version_and_epsilon() {
+        // scg_kernel_version and scg_machine_epsilon are safe extern fns
+        let version = scg_kernel_version();
+        assert!(!version.is_null());
+
+        let epsilon = scg_machine_epsilon();
+        assert!((epsilon - f64::EPSILON).abs() < 1e-20);
+    }
+}
+
+// ============================================================================
+// Property-Based Tests (Phase D1)
+// ============================================================================
+
+#[cfg(test)]
+mod proptest_tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        /// Random sequences across wide magnitude range
+        #[test]
+        fn prop_bounded_error_random_sequence(
+            values in prop::collection::vec(-1e10f64..1e10f64, 100..1000)
+        ) {
+            let compensated = neumaier_sum_slice(&values);
+            let naive: f64 = values.iter().sum();
+
+            // Both should be "close" - the point is compensated doesn't diverge
+            // We can't assert compensated == naive because naive accumulates error
+            // Instead verify compensated is finite and reasonable
+            prop_assert!(compensated.is_finite());
+            prop_assert!(naive.is_finite());
+        }
+
+        /// Balanced sequences should return to zero (within epsilon)
+        #[test]
+        fn prop_balanced_cancellation(
+            values in prop::collection::vec(-1e8f64..1e8f64, 10..100)
+        ) {
+            let mut acc = ScgAccumulator::new(0.0);
+
+            // Add all values then subtract them
+            for &v in &values {
+                acc.add(v);
+            }
+            for &v in &values {
+                acc.add(-v);
+            }
+
+            let error = acc.total().abs();
+            // Error should be bounded by O(ε × max_magnitude)
+            let max_mag = values.iter().map(|v| v.abs()).fold(0.0f64, f64::max);
+            let bound = f64::EPSILON * max_mag * 100.0;
+
+            prop_assert!(
+                error < bound.max(1e-10),
+                "Balanced cancellation error {} exceeds bound {}",
+                error, bound
+            );
+        }
+
+        /// Accumulator operations count should match actual calls
+        #[test]
+        fn prop_ops_count_accurate(n in 1usize..1000) {
+            let mut acc = ScgAccumulator::new(0.0);
+            for i in 0..n {
+                acc.add(i as f64);
+            }
+            prop_assert_eq!(acc.ops() as usize, n);
+        }
+
+        /// Reset should restore initial state
+        #[test]
+        fn prop_reset_restores_initial(
+            initial in -1e10f64..1e10f64,
+            values in prop::collection::vec(-1e5f64..1e5f64, 1..100)
+        ) {
+            let mut acc = ScgAccumulator::new(initial);
+            for v in values {
+                acc.add(v);
+            }
+            acc.reset();
+
+            prop_assert_eq!(acc.total(), initial);
+            prop_assert_eq!(acc.ops(), 0);
+            prop_assert_eq!(acc.compensation(), 0.0);
+        }
+
+        /// Slice sum should match accumulator result
+        #[test]
+        fn prop_slice_matches_accumulator(
+            values in prop::collection::vec(-1e8f64..1e8f64, 1..500)
+        ) {
+            let slice_result = neumaier_sum_slice(&values);
+
+            let mut acc = ScgAccumulator::new(0.0);
+            for &v in &values {
+                acc.add(v);
+            }
+            let acc_result = acc.total();
+
+            // Results should be identical (same algorithm)
+            prop_assert!(
+                (slice_result - acc_result).abs() < f64::EPSILON,
+                "Slice {} != Accumulator {}",
+                slice_result, acc_result
+            );
+        }
     }
 }

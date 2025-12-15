@@ -1,0 +1,31 @@
+# Drift Kernel ABI v1.0.0 - Expected exported symbols
+# This file is the source of truth for ABI compatibility checks.
+# 
+# Format: one symbol per line
+# Lines starting with # are comments
+#
+# Changes to this file require:
+# - Version bump per ABI.md policy
+# - CHANGELOG entry
+
+# Accumulator lifecycle
+scg_accumulator_new
+scg_accumulator_free
+
+# Accumulator operations
+scg_accumulator_add
+scg_accumulator_reset
+
+# Accumulator queries
+scg_accumulator_total
+scg_accumulator_raw_sum
+scg_accumulator_compensation
+scg_accumulator_drift
+scg_accumulator_ops
+
+# Utility functions
+scg_neumaier_sum
+
+# Metadata
+scg_kernel_version
+scg_machine_epsilon

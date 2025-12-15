@@ -1,0 +1,113 @@
+name: ABI Check
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  abi-symbols:
+    name: ABI symbol verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      
+      - name: Build release
+        run: cargo build --release
+      
+      - name: Extract symbols
+        run: |
+          # Extract only scg_* symbols (our public ABI)
+          nm -gD target/release/libdrift_kernel.so 2>/dev/null | \
+            grep ' T scg_' | \
+            awk '{print $3}' | \
+            sort > /tmp/actual_symbols.txt || true
+          
+          # Extract expected symbols (ignoring comments and blank lines)
+          grep -v '^#' abi/symbols.expected.txt | \
+            grep -v '^$' | \
+            sort > /tmp/expected_symbols.txt
+          
+          echo "=== Expected symbols ==="
+          cat /tmp/expected_symbols.txt
+          echo ""
+          echo "=== Actual symbols ==="
+          cat /tmp/actual_symbols.txt
+          echo ""
+      
+      - name: Compare ABI
+        run: |
+          if ! diff -q /tmp/expected_symbols.txt /tmp/actual_symbols.txt > /dev/null 2>&1; then
+            echo "::error::ABI mismatch detected!"
+            echo ""
+            echo "=== Diff ==="
+            diff -u /tmp/expected_symbols.txt /tmp/actual_symbols.txt || true
+            echo ""
+            echo "If this is intentional:"
+            echo "1. Update abi/symbols.expected.txt"
+            echo "2. Bump version per ABI.md policy"
+            echo "3. Add CHANGELOG entry"
+            exit 1
+          else
+            echo "ABI check passed - all expected symbols present"
+          fi
+
+  ffi-test-linux:
+    name: FFI test (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      
+      - name: Build release
+        run: cargo build --release
+      
+      - name: Compile and run FFI tests
+        run: |
+          gcc -o test_abi tests/ffi/test_abi.c \
+            -L target/release \
+            -ldrift_kernel \
+            -I include \
+            -lm
+          LD_LIBRARY_PATH=target/release ./test_abi
+
+  ffi-test-windows:
+    name: FFI test (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      
+      - name: Build release
+        run: cargo build --release
+      
+      - name: Compile and run FFI tests
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          cl /I include tests\ffi\test_abi.c target\release\drift_kernel.dll.lib /Fe:test_abi.exe
+          set PATH=%PATH%;target\release
+          test_abi.exe
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+      
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+      
+      - name: Generate coverage
+        run: cargo llvm-cov --all-features --lcov --output-path lcov.info
+      
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: lcov.info
+          fail_ci_if_error: false
