@@ -45,6 +45,7 @@ jobs:
   audit:
     name: Security audit
     runs-on: ubuntu-latest
+    continue-on-error: true  # Don't block CI on advisory DB fetch failures
     steps:
       - uses: actions/checkout@v4
       - uses: rustsec/audit-check@v2
