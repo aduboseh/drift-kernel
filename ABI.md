@@ -1,5 +1,7 @@
 # Drift Kernel ABI
 
+**Version:** 1.0.0
+
 The stable C ABI surface is defined by the exported `extern "C"` symbols in `src/lib.rs` and the declarations in `include/drift_kernel.h`.
 
 ## ABI version macros

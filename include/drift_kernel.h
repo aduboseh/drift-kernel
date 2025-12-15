@@ -1,8 +1,8 @@
 /**
- * Drift Kernel - Zero-Drift Numerical Primitives
+ * Drift Kernel — Bounded-Error Numerical Primitives
  * 
  * A minimal C API for Neumaier-compensated summation.
- * Deterministic accumulation primitive for governed execution environments.
+ * Compensated accumulation primitive with stable ABI.
  *
  * EXECUTION CONTRACT:
  * Drift Kernel provides numerical accumulation primitives with bounded drift.
@@ -11,9 +11,9 @@
  * input ordering, or replay mechanisms.
  * Integrators are responsible for enforcing a stable execution contract.
  * 
- * Machine Precision Guarantee:
- *   Standard floating-point: O(n × ε) drift (accumulates)
- *   Drift Kernel (Neumaier): O(ε) drift (bounded)
+ * Error Bounds (IEEE-754 binary64):
+ *   Standard floating-point: O(n × ε) error growth (unbounded)
+ *   Drift Kernel (Neumaier): O(ε) error (bounded)
  * 
  * Example:
  *   ScgAccumulator* acc = scg_accumulator_new(1000000.0);
