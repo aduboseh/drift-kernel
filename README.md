@@ -232,6 +232,8 @@ See [docs/VALIDATION.md](docs/VALIDATION.md) for detailed coverage information.
 
 Apache-2.0
 
+Apache-2.0 covers use, modification, and redistribution. Commercial licenses are available for organizations requiring paid support, integration assistance, or contractual assurances.
+
 ## Contact
 
 For integration support or licensing inquiries:

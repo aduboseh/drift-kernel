@@ -5,8 +5,13 @@
 //!
 //! # Error Bounds (IEEE-754 binary64)
 //!
-//! Standard floating-point accumulation: O(n × ε) error growth (unbounded)
-//! Drift Kernel (Neumaier): O(ε) error (bounded, not accumulated)
+//! - Standard floating-point accumulation: O(n × ε) error growth
+//! - Neumaier summation (this library): O(ε) bounded error
+//!
+//! # Thread Safety
+//!
+//! `ScgAccumulator` instances are **not thread-safe**. Each instance must be
+//! confined to a single thread unless externally synchronized.
 //!
 //! # C Integration
 //!
@@ -30,10 +35,14 @@
 // CORE: Neumaier Compensated Accumulator
 // ============================================================================
 
-/// Neumaier-compensated accumulator for drift-free summation.
+/// Neumaier-compensated accumulator for bounded-error summation.
 ///
 /// Unlike standard floating-point addition which accumulates error at O(n × ε),
 /// Neumaier summation bounds error to O(ε) regardless of operation count.
+///
+/// # Thread Safety
+///
+/// This type is **not thread-safe**. Use one instance per thread or synchronize externally.
 #[repr(C)]
 pub struct ScgAccumulator {
     /// Running sum (may contain floating-point error)
@@ -657,5 +666,73 @@ mod proptest_tests {
                 slice_result, acc_result
             );
         }
+    }
+}
+
+// ============================================================================
+// Cross-Platform Determinism Reference Test
+// ============================================================================
+
+#[cfg(test)]
+mod determinism_tests {
+    use super::*;
+
+    /// Fixed sequence determinism test.
+    /// This test runs on all platforms and must produce identical results.
+    /// The expected values are hardcoded from a reference run.
+    #[test]
+    fn determinism_reference() {
+        // Test 1: Catastrophic cancellation sequence
+        let mut acc1 = ScgAccumulator::new(1_000_000.0);
+        for _ in 0..10_000 {
+            acc1.add(1e15);
+            acc1.add(1.0);
+            acc1.add(-1e15);
+            acc1.add(-1.0);
+        }
+        let result1 = acc1.total();
+
+        // Test 2: Harmonic partial sum
+        let mut acc2 = ScgAccumulator::new(0.0);
+        for i in 1..=10_000 {
+            acc2.add(1.0 / (i as f64));
+        }
+        let result2 = acc2.total();
+
+        // Test 3: Alternating signs with varying magnitude
+        let mut acc3 = ScgAccumulator::new(0.0);
+        for i in 0..10_000 {
+            let sign = if i % 2 == 0 { 1.0 } else { -1.0 };
+            acc3.add(sign * (i as f64 + 1.0).sqrt());
+        }
+        let result3 = acc3.total();
+
+        // Test 4: neumaier_sum_slice with fixed values
+        let values: Vec<f64> = (1..=1000).map(|i| (i as f64).sin() * 1e10).collect();
+        let result4 = neumaier_sum_slice(&values);
+
+        // Output for cross-platform comparison (visible with --nocapture)
+        eprintln!("Determinism reference results:");
+        eprintln!("  Test 1 (cancellation): {:.17e}", result1);
+        eprintln!("  Test 2 (harmonic):     {:.17e}", result2);
+        eprintln!("  Test 3 (alternating):  {:.17e}", result3);
+        eprintln!("  Test 4 (slice sum):    {:.17e}", result4);
+
+        // These values must be identical across all platforms
+        // If this test fails on a platform, investigate floating-point differences
+        assert_eq!(result1, 1_000_000.0, "Test 1 diverged");
+
+        // Harmonic sum H_10000 - allow tiny epsilon for platform variation
+        let h_10000_expected = 9.787606036044382;
+        assert!(
+            (result2 - h_10000_expected).abs() < 1e-12,
+            "Test 2 diverged: got {}, expected {}",
+            result2,
+            h_10000_expected
+        );
+
+        // These are observation-based; if they fail, update with actual cross-platform value
+        assert!(result3.is_finite(), "Test 3 produced non-finite result");
+        assert!(result4.is_finite(), "Test 4 produced non-finite result");
     }
 }

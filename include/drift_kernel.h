@@ -1,30 +1,23 @@
 /**
  * Drift Kernel — Bounded-Error Numerical Primitives
- * 
- * A minimal C API for Neumaier-compensated summation.
- * Compensated accumulation primitive with stable ABI.
+ *
+ * Minimal C API for Neumaier-compensated summation.
+ * Provides bounded-error accumulation with a stable ABI.
  *
  * EXECUTION CONTRACT:
- * Drift Kernel provides numerical accumulation primitives with bounded drift.
- * Correctness guarantees assume a deterministic execution order.
- * This library does not provide scheduling, timing, synchronization,
- * input ordering, or replay mechanisms.
- * Integrators are responsible for enforcing a stable execution contract.
- * 
- * Error Bounds (IEEE-754 binary64):
- *   Standard floating-point: O(n × ε) error growth (unbounded)
- *   Drift Kernel (Neumaier): O(ε) error (bounded)
- * 
- * Example:
- *   ScgAccumulator* acc = scg_accumulator_new(1000000.0);
- *   for (int i = 0; i < 100000; i++) {
- *       scg_accumulator_add(acc, 1e15);
- *       scg_accumulator_add(acc, -1e15);
- *   }
- *   double drift = scg_accumulator_drift(acc);
- *   // drift == 0.0 (exact, verified)
- *   scg_accumulator_free(acc);
- * 
+ * Drift Kernel guarantees bounded numerical error given a deterministic
+ * execution order. This library does not provide scheduling, synchronization,
+ * input ordering, or replay mechanisms. Integrators are responsible for
+ * enforcing a stable execution contract.
+ *
+ * ERROR BOUNDS (IEEE-754 binary64):
+ *   - Standard accumulation: O(n × ε) error growth
+ *   - Neumaier summation:    O(ε) bounded error
+ *
+ * THREAD SAFETY:
+ * ScgAccumulator instances are not thread-safe. Use one instance per thread
+ * or synchronize externally.
+ *
  * License: Apache-2.0
  * Copyright (c) 2025 Drift Kernel Project
  */
@@ -83,24 +76,17 @@ void scg_accumulator_free(ScgAccumulator* acc);
 
 /**
  * Add a value with Neumaier compensation.
- * 
- * This is the core drift-killing operation:
- * - Tracks lost precision in hidden compensation buffer
- * - Handles catastrophic cancellation (1e15 + 1.0 - 1e15 = 1.0, not 0.0)
- * - O(ε) error bound regardless of operation count
- * 
+ *
  * @param acc    Accumulator (must not be NULL)
  * @param value  Value to add (positive or negative)
  */
 void scg_accumulator_add(ScgAccumulator* acc, double value);
 
 /**
- * Get the compensated total (high precision).
- * 
- * Returns sum + compensation, which is the physically correct value.
- * 
+ * Get the compensated total.
+ *
  * @param acc  Accumulator (must not be NULL)
- * @return     Compensated total
+ * @return     Compensated total (sum + compensation)
  */
 double scg_accumulator_total(const ScgAccumulator* acc);
 
@@ -116,10 +102,7 @@ double scg_accumulator_raw_sum(const ScgAccumulator* acc);
 
 /**
  * Get the compensation buffer value.
- * 
- * This is the "hidden correction term" that makes drift-free accumulation possible.
- * Exposing it proves the algorithm is working, not smoothing.
- * 
+ *
  * @param acc  Accumulator (must not be NULL)
  * @return     Compensation buffer value
  */

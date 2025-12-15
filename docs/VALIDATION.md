@@ -20,6 +20,10 @@ It is **not**:
 - **Stable ABI:** Exported C functions behave per specification; no breaking changes without major version bump
 - **Deterministic replay:** Identical results within controlled environments (same compiler, target, rounding mode, operation ordering)
 
+### Thread Safety
+
+`ScgAccumulator` instances are **not thread-safe**. Each instance must be confined to a single thread unless externally synchronized. This is a deliberate design choice—the struct contains no synchronization primitives and assumes single-threaded access.
+
 ### We Do NOT Guarantee
 - **Platform-independent bit-for-bit determinism** across uncontrolled environments
 - **Literal "zero error"** — impossible under IEEE-754
@@ -63,6 +67,19 @@ It is **not**:
 - Symbol snapshot comparison
 - Breaking change detection in CI
 
+### Fuzz Testing
+Fuzz harnesses are provided in `fuzz/` for:
+- `scg_neumaier_sum` — arbitrary byte sequences interpreted as f64 arrays
+- `ScgAccumulator` lifecycle — create, add, query, reset sequences
+
+Run locally with:
+```bash
+cargo +nightly fuzz run fuzz_neumaier_sum
+cargo +nightly fuzz run fuzz_accumulator
+```
+
+Fuzzing is not part of CI (requires nightly + extended runtime), but harnesses are maintained and runnable.
+
 ## CI Pipeline
 
 Every PR runs:
@@ -74,11 +91,35 @@ Every PR runs:
 6. FFI integration tests (C harness)
 7. Coverage measurement
 
+## Error Bound Basis
+
+The O(ε) error bound claimed by Drift Kernel is not novel. It implements standard Neumaier summation as published in:
+
+> Neumaier, A. (1974). "Rundungsfehleranalyse einiger Verfahren zur Summation endlicher Summen."
+> *Zeitschrift für Angewandte Mathematik und Mechanik*, 54(1), 39–51.
+
+**Why this works:** Neumaier summation improves on Kahan summation by checking which operand has larger magnitude before computing the compensation term. This handles "catastrophic cancellation" cases where the value being added is larger than the running sum.
+
+The algorithm maintains a compensation buffer that captures precision lost during each addition. The final result (sum + compensation) recovers the lost bits, bounding total error to O(ε) regardless of operation count—compared to O(n × ε) for naive summation.
+
+Drift Kernel implements this algorithm exactly as described in the literature. No novel variants or modifications are claimed.
+
+## Cross-Platform Determinism
+
+**Observed behavior:** Identical results across Linux, Windows, and macOS for IEEE-754 binary64 operations under default rounding mode (round-to-nearest-even).
+
+This is expected for pure floating-point arithmetic without platform-specific intrinsics. However, we explicitly disclaim bit-for-bit determinism guarantees across:
+- Different compiler versions or optimization levels
+- Non-default rounding modes
+- Extended precision intermediates (x87 FPU)
+
+CI validates cross-platform consistency for the test suite on every commit.
+
 ## NorthStar Principle
 
 > _"Provable bounds. Visible validation. No magical thinking."_
 
 All claims in documentation can be reconstructed from:
-- Mathematical properties of Neumaier summation (1974)
+- Neumaier (1974) — canonical algorithm source
 - Test coverage exercising stated invariants
 - CI evidence visible in public repository

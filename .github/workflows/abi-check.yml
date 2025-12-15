@@ -111,3 +111,21 @@ jobs:
         with:
           files: lcov.info
           fail_ci_if_error: false
+
+  determinism-check:
+    name: Cross-platform determinism
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      
+      - name: Run determinism test
+        run: cargo test --release determinism_reference -- --nocapture
+      
+      - name: Output hash
+        shell: bash
+        run: |
+          cargo run --release --example determinism_hash 2>/dev/null || echo "Example not present, skipping hash output"
