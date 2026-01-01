@@ -13,6 +13,18 @@
 //! `ScgAccumulator` instances are **not thread-safe**. Each instance must be
 //! confined to a single thread unless externally synchronized.
 //!
+//! # Rust Usage
+//!
+//! ```rust
+//! use drift_kernel::{Neumaier, DriftAccumulator};
+//!
+//! let mut acc = Neumaier::new(0.0);
+//! acc.add(1e16);
+//! acc.add(1.0);
+//! acc.add(-1e16);
+//! assert!((acc.total() - 1.0).abs() < 1e-10);
+//! ```
+//!
 //! # C Integration
 //!
 //! ```c
@@ -31,11 +43,60 @@
 // NOTE: We use std for heap allocation (Box) required by C FFI.
 // The core algorithm has no dependencies and is pure Rust.
 
-// ============================================================================
-// CORE: Neumaier Compensated Accumulator
-// ============================================================================
+/// Type alias
+/// This is the preferred name for Rust consumers; "Neumaier" describes the algorithm.
+/// The `ScgAccumulator` name is retained for C FFI compatibility.
+pub type Neumaier = ScgAccumulator;
 
-/// Neumaier-compensated accumulator for bounded-error summation.
+/// Trait for drift-free accumulators.
+/// Implemented by types that provide bounded-error summation.
+pub trait DriftAccumulator {
+    /// Create a new accumulator with the given initial value.
+    fn new(initial: f64) -> Self;
+    /// Add a value using compensated summation.
+    fn add(&mut self, value: f64);
+    /// Get the compensated total.
+    fn total(&self) -> f64;
+    /// Get the raw sum (without compensation).
+    fn raw_sum(&self) -> f64;
+    /// Get the compensation buffer value.
+    fn compensation(&self) -> f64;
+    /// Calculate drift from initial value.
+    fn drift(&self) -> f64;
+    /// Get operation count.
+    fn ops(&self) -> u64;
+    /// Reset to initial state.
+    fn reset(&mut self);
+}
+
+impl DriftAccumulator for ScgAccumulator {
+    fn new(initial: f64) -> Self {
+        ScgAccumulator::new(initial)
+    }
+    fn add(&mut self, value: f64) {
+        ScgAccumulator::add(self, value)
+    }
+    fn total(&self) -> f64 {
+        ScgAccumulator::total(self)
+    }
+    fn raw_sum(&self) -> f64 {
+        ScgAccumulator::raw_sum(self)
+    }
+    fn compensation(&self) -> f64 {
+        ScgAccumulator::compensation(self)
+    }
+    fn drift(&self) -> f64 {
+        ScgAccumulator::drift(self)
+    }
+    fn ops(&self) -> u64 {
+        ScgAccumulator::ops(self)
+    }
+    fn reset(&mut self) {
+        ScgAccumulator::reset(self)
+    }
+}
+
+/// Neumaier-compensated
 ///
 /// Unlike standard floating-point addition which accumulates error at O(n × ε),
 /// Neumaier summation bounds error to O(ε) regardless of operation count.
@@ -43,6 +104,7 @@
 /// # Thread Safety
 ///
 /// This type is **not thread-safe**. Use one instance per thread or synchronize externally.
+#[derive(Debug, Clone, Copy)]
 #[repr(C)]
 pub struct ScgAccumulator {
     /// Running sum (may contain floating-point error)
@@ -139,11 +201,7 @@ impl ScgAccumulator {
     }
 }
 
-// ============================================================================
-// C FFI - Extern Functions
-// ============================================================================
-
-/// Create a new Neumaier-compensated accumulator.
+/// Create a new
 ///
 /// # Safety
 /// Returns a heap-allocated pointer. Caller MUST free with `scg_accumulator_free`.
@@ -250,10 +308,6 @@ pub unsafe extern "C" fn scg_accumulator_reset(acc: *mut ScgAccumulator) {
     (*acc).reset();
 }
 
-// ============================================================================
-// UTILITY: Standalone Neumaier Sum
-// ============================================================================
-
 /// Compute Neumaier sum of an array (one-shot, no state).
 ///
 /// # Safety
@@ -291,10 +345,6 @@ pub fn neumaier_sum_slice(values: &[f64]) -> f64 {
     sum + compensation
 }
 
-// ============================================================================
-// VERSION & METADATA
-// ============================================================================
-
 /// Get library version string.
 ///
 /// Returns a static string pointer. Do NOT free.
@@ -309,17 +359,9 @@ pub extern "C" fn scg_machine_epsilon() -> f64 {
     f64::EPSILON
 }
 
-// ============================================================================
-// TESTS
-// ============================================================================
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    // ========================================================================
-    // Core Algorithm Tests
-    // ========================================================================
 
     #[test]
     fn test_catastrophic_cancellation() {
@@ -382,10 +424,6 @@ mod tests {
     fn test_slice_sum_single() {
         assert_eq!(neumaier_sum_slice(&[42.0]), 42.0);
     }
-
-    // ========================================================================
-    // Long-Horizon Stress Tests (Phase D2)
-    // ========================================================================
 
     #[test]
     fn test_long_accumulation_100k() {
@@ -466,13 +504,9 @@ mod tests {
         );
     }
 
-    // ========================================================================
-    // Adversarial Sequence Tests
-    // ========================================================================
-
     #[test]
     fn test_adversarial_alternating_magnitudes() {
-        // Alternating huge/tiny values: 1e15, 1e-15, 1e15, 1e-15, ...
+        // Alternating huge/tiny values:
         let mut acc = ScgAccumulator::new(0.0);
         const N: usize = 10_000;
 
@@ -513,10 +547,6 @@ mod tests {
             relative_error
         );
     }
-
-    // ========================================================================
-    // FFI Null Safety Tests
-    // ========================================================================
 
     #[test]
     fn test_ffi_null_safety() {
@@ -566,10 +596,6 @@ mod tests {
         assert!((epsilon - f64::EPSILON).abs() < 1e-20);
     }
 }
-
-// ============================================================================
-// Property-Based Tests (Phase D1)
-// ============================================================================
 
 #[cfg(test)]
 mod proptest_tests {
@@ -668,10 +694,6 @@ mod proptest_tests {
         }
     }
 }
-
-// ============================================================================
-// Cross-Platform Determinism Reference Test
-// ============================================================================
 
 #[cfg(test)]
 mod determinism_tests {
