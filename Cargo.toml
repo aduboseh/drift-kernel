@@ -2,19 +2,22 @@
 name = "drift-kernel"
 version = "1.0.0"
 edition = "2021"
-description = "Bounded-Error Numerical Primitives - Neumaier-compensated summation with C FFI"
+description = "Bounded-Error Numerical Primitives - Neumaier-compensated summation"
 authors = ["Armonti Du-Bose-Hill <armonti@onlysg.solutions>"]
 license = "Apache-2.0"
 readme = "README.md"
-keywords = ["physics", "deterministic", "neumaier", "ffi", "game-engine"]
+keywords = ["physics", "deterministic", "neumaier", "game-engine"]
 categories = ["mathematics", "simulation", "game-engines"]
 
 [lib]
 name = "drift_kernel"
-crate-type = ["cdylib", "staticlib", "rlib"]
+crate-type = ["rlib"]
+
+[features]
+default = []
+ffi = []
 
 [dependencies]
-# No runtime dependencies - pure Rust implementation for maximum portability
 
 [dev-dependencies]
 proptest = "1.4"

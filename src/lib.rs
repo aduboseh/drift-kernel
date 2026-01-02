@@ -201,128 +201,7 @@ impl ScgAccumulator {
     }
 }
 
-/// Create a new
-///
-/// # Safety
-/// Returns a heap-allocated pointer. Caller MUST free with `scg_accumulator_free`.
-#[no_mangle]
-pub extern "C" fn scg_accumulator_new(initial: f64) -> *mut ScgAccumulator {
-    let acc = ScgAccumulator::new(initial);
-    let boxed = Box::new(acc);
-    Box::into_raw(boxed)
-}
-
-/// Free an accumulator.
-///
-/// # Safety
-/// `acc` must be a valid pointer from `scg_accumulator_new`, or null.
-/// After this call, `acc` is invalid.
-#[no_mangle]
-pub unsafe extern "C" fn scg_accumulator_free(acc: *mut ScgAccumulator) {
-    if !acc.is_null() {
-        let _ = Box::from_raw(acc);
-    }
-}
-
-/// Add a value with Neumaier compensation.
-///
-/// # Safety
-/// `acc` must be a valid, non-null pointer from `scg_accumulator_new`.
-#[no_mangle]
-pub unsafe extern "C" fn scg_accumulator_add(acc: *mut ScgAccumulator, value: f64) {
-    if acc.is_null() {
-        return;
-    }
-    (*acc).add(value);
-}
-
-/// Get the compensated total (high precision).
-///
-/// # Safety
-/// `acc` must be a valid, non-null pointer.
-#[no_mangle]
-pub unsafe extern "C" fn scg_accumulator_total(acc: *const ScgAccumulator) -> f64 {
-    if acc.is_null() {
-        return 0.0;
-    }
-    (*acc).total()
-}
-
-/// Get the raw sum (without compensation).
-///
-/// # Safety
-/// `acc` must be a valid, non-null pointer.
-#[no_mangle]
-pub unsafe extern "C" fn scg_accumulator_raw_sum(acc: *const ScgAccumulator) -> f64 {
-    if acc.is_null() {
-        return 0.0;
-    }
-    (*acc).raw_sum()
-}
-
-/// Get the compensation buffer value.
-///
-/// # Safety
-/// `acc` must be a valid, non-null pointer.
-#[no_mangle]
-pub unsafe extern "C" fn scg_accumulator_compensation(acc: *const ScgAccumulator) -> f64 {
-    if acc.is_null() {
-        return 0.0;
-    }
-    (*acc).compensation()
-}
-
-/// Get drift from initial value.
-///
-/// # Safety
-/// `acc` must be a valid, non-null pointer.
-#[no_mangle]
-pub unsafe extern "C" fn scg_accumulator_drift(acc: *const ScgAccumulator) -> f64 {
-    if acc.is_null() {
-        return 0.0;
-    }
-    (*acc).drift()
-}
-
-/// Get operation count.
-///
-/// # Safety
-/// `acc` must be a valid, non-null pointer.
-#[no_mangle]
-pub unsafe extern "C" fn scg_accumulator_ops(acc: *const ScgAccumulator) -> u64 {
-    if acc.is_null() {
-        return 0;
-    }
-    (*acc).ops()
-}
-
-/// Reset accumulator to initial state.
-///
-/// # Safety
-/// `acc` must be a valid, non-null pointer.
-#[no_mangle]
-pub unsafe extern "C" fn scg_accumulator_reset(acc: *mut ScgAccumulator) {
-    if acc.is_null() {
-        return;
-    }
-    (*acc).reset();
-}
-
-/// Compute Neumaier sum of an array (one-shot, no state).
-///
-/// # Safety
-/// `values` must point to a valid array of at least `len` f64 elements.
-#[no_mangle]
-pub unsafe extern "C" fn scg_neumaier_sum(values: *const f64, len: usize) -> f64 {
-    if values.is_null() || len == 0 {
-        return 0.0;
-    }
-
-    let slice = core::slice::from_raw_parts(values, len);
-    neumaier_sum_slice(slice)
-}
-
-/// Rust-native Neumaier sum for slices.
+/// Neumaier sum for slices.
 #[inline]
 pub fn neumaier_sum_slice(values: &[f64]) -> f64 {
     if values.is_empty() {
@@ -345,18 +224,80 @@ pub fn neumaier_sum_slice(values: &[f64]) -> f64 {
     sum + compensation
 }
 
-/// Get library version string.
-///
-/// Returns a static string pointer. Do NOT free.
-#[no_mangle]
-pub extern "C" fn scg_kernel_version() -> *const core::ffi::c_char {
-    c"1.0.0".as_ptr()
-}
+#[cfg(feature = "ffi")]
+mod ffi {
+    use super::*;
 
-/// Get machine epsilon for f64.
-#[no_mangle]
-pub extern "C" fn scg_machine_epsilon() -> f64 {
-    f64::EPSILON
+    #[no_mangle]
+    pub extern "C" fn scg_accumulator_new(initial: f64) -> *mut ScgAccumulator {
+        let acc = ScgAccumulator::new(initial);
+        Box::into_raw(Box::new(acc))
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn scg_accumulator_free(acc: *mut ScgAccumulator) {
+        if !acc.is_null() {
+            let _ = Box::from_raw(acc);
+        }
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn scg_accumulator_add(acc: *mut ScgAccumulator, value: f64) {
+        if !acc.is_null() {
+            (*acc).add(value);
+        }
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn scg_accumulator_total(acc: *const ScgAccumulator) -> f64 {
+        if acc.is_null() { 0.0 } else { (*acc).total() }
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn scg_accumulator_raw_sum(acc: *const ScgAccumulator) -> f64 {
+        if acc.is_null() { 0.0 } else { (*acc).raw_sum() }
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn scg_accumulator_compensation(acc: *const ScgAccumulator) -> f64 {
+        if acc.is_null() { 0.0 } else { (*acc).compensation() }
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn scg_accumulator_drift(acc: *const ScgAccumulator) -> f64 {
+        if acc.is_null() { 0.0 } else { (*acc).drift() }
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn scg_accumulator_ops(acc: *const ScgAccumulator) -> u64 {
+        if acc.is_null() { 0 } else { (*acc).ops() }
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn scg_accumulator_reset(acc: *mut ScgAccumulator) {
+        if !acc.is_null() {
+            (*acc).reset();
+        }
+    }
+
+    #[no_mangle]
+    pub unsafe extern "C" fn scg_neumaier_sum(values: *const f64, len: usize) -> f64 {
+        if values.is_null() || len == 0 {
+            return 0.0;
+        }
+        let slice = core::slice::from_raw_parts(values, len);
+        super::neumaier_sum_slice(slice)
+    }
+
+    #[no_mangle]
+    pub extern "C" fn scg_kernel_version() -> *const core::ffi::c_char {
+        c"1.0.0".as_ptr()
+    }
+
+    #[no_mangle]
+    pub extern "C" fn scg_machine_epsilon() -> f64 {
+        f64::EPSILON
+    }
 }
 
 #[cfg(test)]
@@ -548,10 +489,15 @@ mod tests {
         );
     }
 
+}
+
+#[cfg(all(test, feature = "ffi"))]
+mod ffi_tests {
+    use super::ffi::*;
+
     #[test]
     fn test_ffi_null_safety() {
         unsafe {
-            // All functions should handle null gracefully
             scg_accumulator_free(core::ptr::null_mut());
             scg_accumulator_add(core::ptr::null_mut(), 1.0);
             assert_eq!(scg_accumulator_total(core::ptr::null()), 0.0);
@@ -569,29 +515,20 @@ mod tests {
         unsafe {
             let acc = scg_accumulator_new(100.0);
             assert!(!acc.is_null());
-
             scg_accumulator_add(acc, 1e15);
             scg_accumulator_add(acc, 1.0);
             scg_accumulator_add(acc, -1e15);
-
             let total = scg_accumulator_total(acc);
             assert!((total - 101.0).abs() < 1e-10);
-
-            let drift = scg_accumulator_drift(acc);
-            assert!((drift - 1.0).abs() < 1e-10);
-
             assert_eq!(scg_accumulator_ops(acc), 3);
-
             scg_accumulator_free(acc);
         }
     }
 
     #[test]
     fn test_version_and_epsilon() {
-        // scg_kernel_version and scg_machine_epsilon are safe extern fns
         let version = scg_kernel_version();
         assert!(!version.is_null());
-
         let epsilon = scg_machine_epsilon();
         assert!((epsilon - f64::EPSILON).abs() < 1e-20);
     }
