@@ -250,27 +250,47 @@ mod ffi {
 
     #[no_mangle]
     pub unsafe extern "C" fn scg_accumulator_total(acc: *const ScgAccumulator) -> f64 {
-        if acc.is_null() { 0.0 } else { (*acc).total() }
+        if acc.is_null() {
+            0.0
+        } else {
+            (*acc).total()
+        }
     }
 
     #[no_mangle]
     pub unsafe extern "C" fn scg_accumulator_raw_sum(acc: *const ScgAccumulator) -> f64 {
-        if acc.is_null() { 0.0 } else { (*acc).raw_sum() }
+        if acc.is_null() {
+            0.0
+        } else {
+            (*acc).raw_sum()
+        }
     }
 
     #[no_mangle]
     pub unsafe extern "C" fn scg_accumulator_compensation(acc: *const ScgAccumulator) -> f64 {
-        if acc.is_null() { 0.0 } else { (*acc).compensation() }
+        if acc.is_null() {
+            0.0
+        } else {
+            (*acc).compensation()
+        }
     }
 
     #[no_mangle]
     pub unsafe extern "C" fn scg_accumulator_drift(acc: *const ScgAccumulator) -> f64 {
-        if acc.is_null() { 0.0 } else { (*acc).drift() }
+        if acc.is_null() {
+            0.0
+        } else {
+            (*acc).drift()
+        }
     }
 
     #[no_mangle]
     pub unsafe extern "C" fn scg_accumulator_ops(acc: *const ScgAccumulator) -> u64 {
-        if acc.is_null() { 0 } else { (*acc).ops() }
+        if acc.is_null() {
+            0
+        } else {
+            (*acc).ops()
+        }
     }
 
     #[no_mangle]
@@ -488,7 +508,6 @@ mod tests {
             relative_error
         );
     }
-
 }
 
 #[cfg(all(test, feature = "ffi"))]

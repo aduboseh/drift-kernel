@@ -15,7 +15,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       
       - name: Build release
-        run: cargo build --release
+        run: cargo build --release --features ffi
       
       - name: Extract symbols
         run: |
@@ -62,7 +62,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       
       - name: Build release
-        run: cargo build --release
+        run: cargo build --release --features ffi
       
       - name: Compile and run FFI tests
         run: |
@@ -81,7 +81,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       
       - name: Build release
-        run: cargo build --release
+        run: cargo build --release --features ffi
       
       - name: Compile and run FFI tests
         shell: cmd
