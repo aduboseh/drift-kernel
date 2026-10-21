@@ -5,8 +5,9 @@
 //!
 //! # Error Bounds (IEEE-754 binary64)
 //!
-//! - Standard floating-point accumulation: O(n × ε) error growth
-//! - Neumaier summation (this library): O(ε) bounded error
+//! - Naive accumulation may amplify roundoff for long or ill-conditioned sums.
+//! - Neumaier compensation reduces lost low-order bits; error is not universally
+//!   O(ε) independent of length, magnitudes, conditioning, or overflow.
 //!
 //! # Thread Safety
 //!
@@ -98,8 +99,9 @@ impl DriftAccumulator for ScgAccumulator {
 
 /// Neumaier-compensated
 ///
-/// Unlike standard floating-point addition which accumulates error at O(n × ε),
-/// Neumaier summation bounds error to O(ε) regardless of operation count.
+/// Neumaier compensation improves accuracy for many finite summation sequences,
+/// particularly those with severe cancellation. This is **not** an absolute or
+/// length-independent error guarantee; see docs/VALIDATION.md.
 ///
 /// # Thread Safety
 ///
@@ -131,10 +133,10 @@ impl ScgAccumulator {
 
     /// Add a value using Neumaier compensated summation
     ///
-    /// This is the core algorithm that eliminates drift:
+    /// Compensated summation reduces many sources of roundoff error:
     /// - Tracks lost precision in compensation buffer
     /// - Handles catastrophic cancellation (large + small values)
-    /// - Maintains O(ε) error bound regardless of operation count
+    /// - Does not guarantee an O(ε) absolute error independent of operation count
     #[inline]
     pub fn add(&mut self, value: f64) {
         let temp = self.sum + value;
@@ -155,7 +157,7 @@ impl ScgAccumulator {
 
     /// Get the compensated total (sum + compensation)
     ///
-    /// This is the physically correct value with machine precision.
+    /// This is the compensated result; it is still subject to IEEE-754 roundoff.
     #[inline]
     pub fn total(&self) -> f64 {
         self.sum + self.compensation
@@ -172,7 +174,7 @@ impl ScgAccumulator {
     /// Get the compensation buffer value
     ///
     /// This is the "hidden correction term" that makes drift-free accumulation possible.
-    /// Exposing it proves the algorithm is working, not smoothing.
+    /// Exposes a correction term, not a proof of a universal accuracy bound.
     #[inline]
     pub fn compensation(&self) -> f64 {
         self.compensation
