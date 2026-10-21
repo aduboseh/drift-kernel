@@ -84,12 +84,15 @@ jobs:
         run: cargo build --release --features ffi
       
       - name: Compile and run FFI tests
-        shell: cmd
+        shell: pwsh
         run: |
-          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-          cl /I include tests\ffi\test_abi.c target\release\drift_kernel.dll.lib /Fe:test_abi.exe
-          set PATH=%PATH%;target\release
-          test_abi.exe
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\\Installer\\vswhere.exe"
+          if (-not (Test-Path $vswhere)) { throw "Visual Studio Installer vswhere.exe not found" }
+          $vcvars = & $vswhere -latest -products "*" -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -find "VC\\Auxiliary\\Build\\vcvars64.bat" | Select-Object -First 1
+          if (-not $vcvars) { throw "MSVC x64 build tools not found" }
+          $command = ('call "{0}" && cl /I include tests\\ffi\\test_abi.c target\\release\\drift_kernel.dll.lib /Fe:test_abi.exe && set "PATH=%PATH%;target\\release" && test_abi.exe' -f $vcvars)
+          cmd.exe /D /S /C $command
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
   coverage:
     name: Coverage
