@@ -171,10 +171,7 @@ impl ScgAccumulator {
         if !value.is_finite() {
             return Err(AccumulatorError::NonFiniteInput);
         }
-        if !self.sum.is_finite()
-            || !self.compensation.is_finite()
-            || !self.initial.is_finite()
-        {
+        if !self.sum.is_finite() || !self.compensation.is_finite() || !self.initial.is_finite() {
             return Err(AccumulatorError::NonFiniteState);
         }
 
@@ -392,10 +389,7 @@ mod tests {
     fn checked_accumulation_rejects_invalid_values_without_mutation() {
         let mut acc = ScgAccumulator::new(4.0);
         let before = acc;
-        assert_eq!(
-            acc.try_add(f64::NAN),
-            Err(AccumulatorError::NonFiniteInput)
-        );
+        assert_eq!(acc.try_add(f64::NAN), Err(AccumulatorError::NonFiniteInput));
         assert_eq!(acc.total(), before.total());
         assert_eq!(acc.ops(), before.ops());
     }
