@@ -11,8 +11,9 @@
  * enforcing a stable execution contract.
  *
  * ERROR BOUNDS (IEEE-754 binary64):
- *   - Standard accumulation: O(n × ε) error growth
- *   - Neumaier summation:    O(ε) bounded error
+ *   - Neumaier compensation often reduces roundoff versus naive accumulation.
+ *   - No universal O(ε) absolute bound independent of input size, condition,
+ *     operation count, or floating-point range is claimed.
  *
  * THREAD SAFETY:
  * ScgAccumulator instances are not thread-safe. Use one instance per thread
