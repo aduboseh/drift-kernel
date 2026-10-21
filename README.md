@@ -1,10 +1,10 @@
 # Drift Kernel — Bounded-Error Numerical Primitives
 
-**Compensated summation primitive with stable C ABI.**
+**Compensated summation primitive with a versioned, feature-gated C ABI.**
 
 [![CI](https://github.com/aduboseh/drift-kernel/actions/workflows/ci.yml/badge.svg)](https://github.com/aduboseh/drift-kernel/actions/workflows/ci.yml)
 
-**Validation:** Tested across Linux/Windows/macOS with property-based tests, 1M-operation stress tests, ABI symbol verification, and C FFI harness. See [docs/VALIDATION.md](docs/VALIDATION.md).
+**Validation:** The repository defines cross-platform tests, stress cases, and ABI checks. Review actual CI results before making release guarantees. See [docs/VALIDATION.md](docs/VALIDATION.md).
 
 > **Note on Terminology:**
 > Earlier drafts used imprecise language around "zero drift." This has been corrected to reflect bounded, provable error behavior under IEEE-754. See [Guarantees](#guarantees) for precise statements.
@@ -12,13 +12,13 @@
 ## Guarantees
 
 ### We guarantee (for Drift Kernel–scoped operations only):
-- **Bounded numerical error:** O(ε) error growth vs. O(n × ε) for naive summation, under IEEE-754 binary64.
+- **Improved accuracy in many sums:** Neumaier compensation mitigates loss of low-order bits; no universal absolute error bound independent of input scale, conditioning, or operation count is claimed.
 - **Stable ABI:** Exported C functions behave per specification; no breaking changes without major version bump.
 - **Deterministic replay:** Identical results within controlled environments (same compiler, target, rounding mode, operation ordering).
 
 ### We do NOT guarantee:
 - **Platform-independent bit-for-bit determinism** across uncontrolled environments (different compilers, architectures, or rounding modes).
-- **Literal "zero error"** — impossible under IEEE-754 floating-point arithmetic.
+- **Literal "zero error"**, or absolute O(ε) error independent of input size and conditioning.
 - **Global simulation determinism** — that is the responsibility of the integrating runtime, not this primitive.
 
 ### You must control:
@@ -100,14 +100,14 @@ for (int i = 0; i < 100000; i++) {
     scg_accumulator_add(acc, -1e15);
 }
 double result = scg_accumulator_total(acc);
-// result == 1000000.0 (bounded error, not accumulated)
+// For this test case, the compensated sum should preserve the initial value.
 scg_accumulator_free(acc);
 ```
 
 ## Error Bounds
 
-- **Standard accumulation:** Error grows as O(n × ε) where n = operation count, ε = machine epsilon (~2.22e-16)
-- **Neumaier (this library):** Error bounded at O(ε) regardless of operation count
+- **Standard accumulation:** Roundoff can grow with length and cancellation.
+- **Neumaier (this library):** Compensation often lowers error, but accuracy depends on input magnitudes, conditioning, sequence length and floating-point assumptions. See `docs/VALIDATION.md`.
 
 This is a mathematical property of the algorithm, not a performance claim. See `cargo bench` for actual timing measurements on your hardware.
 
@@ -125,7 +125,7 @@ void scg_accumulator_add(ScgAccumulator* acc, double value);
 void scg_accumulator_reset(ScgAccumulator* acc);
 
 // Queries
-double scg_accumulator_total(const ScgAccumulator* acc);      // Compensated (exact)
+double scg_accumulator_total(const ScgAccumulator* acc);      // Compensated (rounded)
 double scg_accumulator_raw_sum(const ScgAccumulator* acc);    // Uncompensated
 double scg_accumulator_compensation(const ScgAccumulator* acc); // Hidden correction
 double scg_accumulator_drift(const ScgAccumulator* acc);      // total - initial
@@ -187,8 +187,8 @@ public static class DriftKernel {
 ## Build
 
 ```bash
-# Build all library formats
-cargo build --release
+# Build both Rust and C library formats (the C symbols are feature gated)
+cargo build --release --features ffi
 
 # Output:
 # target/release/drift_kernel.dll      (Windows dynamic)
@@ -197,7 +197,7 @@ cargo build --release
 # target/release/libdrift_kernel.a     (Linux static)
 ```
 
-Note: `Cargo.lock` is intentionally not committed (this is a library crate).
+Downstream applications must pin a verified source revision and commit their `Cargo.lock`; a crate version alone does not establish dependency identity.
 
 ## Why This Works
 
@@ -212,10 +212,10 @@ For each addition:
     compensation += (value - temp) + sum  // Lost from value
   sum = temp
 
-Result = sum + compensation  // Bounded to machine precision
+Result = sum + compensation  // Compensated, still subject to rounding
 ```
 
-This bounds error to O(ε) regardless of operation count, while standard accumulation grows as O(n × ε).
+This can substantially reduce roundoff relative to naive accumulation, but does not establish a constant absolute error bound for arbitrary inputs.
 
 ## Verification
 
