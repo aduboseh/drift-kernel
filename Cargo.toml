@@ -11,7 +11,7 @@ categories = ["mathematics", "simulation", "game-engines"]
 
 [lib]
 name = "drift_kernel"
-crate-type = ["rlib", "cdylib"]
+crate-type = ["rlib", "cdylib", "staticlib"]
 
 [features]
 default = []

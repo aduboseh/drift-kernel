@@ -5,8 +5,9 @@
 //!
 //! # Error Bounds (IEEE-754 binary64)
 //!
-//! - Standard floating-point accumulation: O(n × ε) error growth
-//! - Neumaier summation (this library): O(ε) bounded error
+//! - Naive accumulation may amplify roundoff for long or ill-conditioned sums.
+//! - Neumaier compensation reduces lost low-order bits; error is not universally
+//!   O(ε) independent of length, magnitudes, conditioning, or overflow.
 //!
 //! # Thread Safety
 //!
@@ -98,12 +99,22 @@ impl DriftAccumulator for ScgAccumulator {
 
 /// Neumaier-compensated
 ///
-/// Unlike standard floating-point addition which accumulates error at O(n × ε),
-/// Neumaier summation bounds error to O(ε) regardless of operation count.
+/// Neumaier compensation improves accuracy for many finite summation sequences,
+/// particularly those with severe cancellation. This is **not** an absolute or
+/// length-independent error guarantee; see docs/VALIDATION.md.
 ///
 /// # Thread Safety
 ///
 /// This type is **not thread-safe**. Use one instance per thread or synchronize externally.
+/// Errors returned by the opt-in fail-closed accumulator API.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AccumulatorError {
+    NonFiniteInput,
+    NonFiniteState,
+    ArithmeticOverflow,
+    OperationCountOverflow,
+}
+
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
 pub struct ScgAccumulator {
@@ -131,10 +142,10 @@ impl ScgAccumulator {
 
     /// Add a value using Neumaier compensated summation
     ///
-    /// This is the core algorithm that eliminates drift:
+    /// Compensated summation reduces many sources of roundoff error:
     /// - Tracks lost precision in compensation buffer
     /// - Handles catastrophic cancellation (large + small values)
-    /// - Maintains O(ε) error bound regardless of operation count
+    /// - Does not guarantee an O(ε) absolute error independent of operation count
     #[inline]
     pub fn add(&mut self, value: f64) {
         let temp = self.sum + value;
@@ -153,9 +164,59 @@ impl ScgAccumulator {
         self.ops += 1;
     }
 
+    /// Add a finite value atomically, rejecting non-finite values, overflow,
+    /// and an exhausted operation counter. Legacy `add` remains unchecked for
+    /// backwards compatibility. FADO should use this checked method.
+    pub fn try_add(&mut self, value: f64) -> Result<(), AccumulatorError> {
+        if !value.is_finite() {
+            return Err(AccumulatorError::NonFiniteInput);
+        }
+        if !self.sum.is_finite() || !self.compensation.is_finite() || !self.initial.is_finite() {
+            return Err(AccumulatorError::NonFiniteState);
+        }
+
+        let next_ops = self
+            .ops
+            .checked_add(1)
+            .ok_or(AccumulatorError::OperationCountOverflow)?;
+        let next_sum = self.sum + value;
+        if !next_sum.is_finite() {
+            return Err(AccumulatorError::ArithmeticOverflow);
+        }
+        let correction = if self.sum.abs() >= value.abs() {
+            (self.sum - next_sum) + value
+        } else {
+            (value - next_sum) + self.sum
+        };
+        let next_compensation = self.compensation + correction;
+        if !correction.is_finite()
+            || !next_compensation.is_finite()
+            || !(next_sum + next_compensation).is_finite()
+        {
+            return Err(AccumulatorError::ArithmeticOverflow);
+        }
+
+        self.sum = next_sum;
+        self.compensation = next_compensation;
+        self.ops = next_ops;
+        Ok(())
+    }
+
+    /// Return a finite compensated total or a typed error.
+    pub fn try_total(&self) -> Result<f64, AccumulatorError> {
+        if !self.sum.is_finite() || !self.compensation.is_finite() {
+            return Err(AccumulatorError::NonFiniteState);
+        }
+        let result = self.sum + self.compensation;
+        if !result.is_finite() {
+            return Err(AccumulatorError::ArithmeticOverflow);
+        }
+        Ok(result)
+    }
+
     /// Get the compensated total (sum + compensation)
     ///
-    /// This is the physically correct value with machine precision.
+    /// This is the compensated result; it is still subject to IEEE-754 roundoff.
     #[inline]
     pub fn total(&self) -> f64 {
         self.sum + self.compensation
@@ -172,7 +233,7 @@ impl ScgAccumulator {
     /// Get the compensation buffer value
     ///
     /// This is the "hidden correction term" that makes drift-free accumulation possible.
-    /// Exposing it proves the algorithm is working, not smoothing.
+    /// Exposes a correction term, not a proof of a universal accuracy bound.
     #[inline]
     pub fn compensation(&self) -> f64 {
         self.compensation
@@ -323,6 +384,36 @@ mod ffi {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn checked_accumulation_rejects_invalid_values_without_mutation() {
+        let mut acc = ScgAccumulator::new(4.0);
+        let before = acc;
+        assert_eq!(acc.try_add(f64::NAN), Err(AccumulatorError::NonFiniteInput));
+        assert_eq!(acc.total(), before.total());
+        assert_eq!(acc.ops(), before.ops());
+    }
+
+    #[test]
+    fn checked_accumulation_rejects_overflow_without_mutation() {
+        let mut acc = ScgAccumulator::new(f64::MAX);
+        assert_eq!(
+            acc.try_add(f64::MAX),
+            Err(AccumulatorError::ArithmeticOverflow)
+        );
+        assert_eq!(acc.total(), f64::MAX);
+        assert_eq!(acc.ops(), 0);
+    }
+
+    #[test]
+    fn checked_accumulation_preserves_compensation_and_finite_output() {
+        let mut acc = ScgAccumulator::new(0.0);
+        acc.try_add(1e16).unwrap();
+        acc.try_add(1.0).unwrap();
+        acc.try_add(-1e16).unwrap();
+        assert_eq!(acc.try_total().unwrap(), 1.0);
+        assert_eq!(acc.ops(), 3);
+    }
 
     #[test]
     fn test_catastrophic_cancellation() {

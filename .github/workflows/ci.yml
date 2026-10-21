@@ -45,9 +45,10 @@ jobs:
   audit:
     name: Security audit
     runs-on: ubuntu-latest
-    continue-on-error: true  # Don't block CI on advisory DB fetch failures
     steps:
       - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo generate-lockfile
       - uses: rustsec/audit-check@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -70,7 +71,17 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
-      - run: cargo build --release --target ${{ matrix.target }}
+      - run: cargo build --release --features ffi --target ${{ matrix.target }}
+      - name: Assert exported C ABI symbols (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          library="target/${{ matrix.target }}/release/libdrift_kernel.so"
+          test -f "$library"
+          for symbol in scg_accumulator_new scg_accumulator_add scg_accumulator_total scg_accumulator_free scg_neumaier_sum scg_kernel_version; do
+            nm -D --defined-only "$library" | grep -Eq "[[:space:]]${symbol}$"
+          done
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:

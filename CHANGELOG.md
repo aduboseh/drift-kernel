@@ -33,4 +33,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- (future changes go here)
+- Checked `ScgAccumulator::try_add` and `try_total` with typed rejection of nonfinite and overflow conditions, without partial state mutation.
+- Regression tests covering checked failure paths and compensated cancellation.
+- Explicit `ffi` release build and Linux C symbol checks; static library crate type.
+- APEX-DRIFT-TRIO-001 governance and acceptance directive.
+
+### Fixed
+- Windows FFI CI discovers the installed MSVC toolchain instead of relying on a hardcoded Visual Studio Enterprise directory.
+- Security audit is blocking instead of `continue-on-error`.
+
+### Numerical claim erratum
+- The historical v1.0.0 entry below said compensated summation had input-independent `O(ε)` bounded error. **That statement was overstated.** Neumaier compensation reduces rounding error in many finite sequences; rigorous bounds depend on input magnitude, conditioning, operation count, and arithmetic assumptions. The historical release remains unchanged; this entry corrects its published claim.

@@ -16,7 +16,7 @@ It is **not**:
 ## Guarantee Boundaries
 
 ### We Guarantee (for Drift Kernel–scoped operations only)
-- **Bounded numerical error:** O(ε) error growth vs. O(n × ε) for naive summation, under IEEE-754 binary64
+- **Compensated summation:** Neumaier compensation generally reduces roundoff relative to naive summation, but does not guarantee absolute O(ε) error independent of input magnitude, condition, or operation count.
 - **Stable ABI:** Exported C functions behave per specification; no breaking changes without major version bump
 - **Deterministic replay:** Identical results within controlled environments (same compiler, target, rounding mode, operation ordering)
 
@@ -26,7 +26,7 @@ It is **not**:
 
 ### We Do NOT Guarantee
 - **Platform-independent bit-for-bit determinism** across uncontrolled environments
-- **Literal "zero error"** — impossible under IEEE-754
+- **Literal "zero error"** or any input-independent absolute O(ε) error claim
 - **Global simulation determinism** — responsibility of the integrating runtime
 
 ### You Must Control
@@ -58,6 +58,10 @@ It is **not**:
 - Adversarial alternating magnitude sequences
 - Small value accumulation precision
 
+### Build and ABI Contract
+
+C export functions are gated behind the `ffi` Cargo feature. Build with `cargo build --release --features ffi`; a default build does not provide the documented C symbols. CI must inspect release artifacts and confirm exported symbols before release.
+
 ### FFI Integration Tests
 - C harness exercising full API
 - Null pointer safety verification
@@ -82,6 +86,8 @@ Fuzzing is not part of CI (requires nightly + extended runtime), but harnesses a
 
 ## CI Pipeline
 
+The following are intended release checks; evidence must be taken from the actual completed workflow, not this document.
+
 Every PR runs:
 1. `cargo fmt --check`
 2. `cargo clippy -- -D warnings`
@@ -89,31 +95,31 @@ Every PR runs:
 4. `cargo audit` (security advisory check)
 5. ABI symbol verification
 6. FFI integration tests (C harness)
-7. Coverage measurement
+7. Coverage measurement when configured; do not claim coverage is measured without a report.
 
 ## Error Bound Basis
 
-The O(ε) error bound claimed by Drift Kernel is not novel. It implements standard Neumaier summation as published in:
+Drift Kernel implements classical Neumaier summation, not a novel algorithm or universal length-independent error bound. Foundational reference:
 
 > Neumaier, A. (1974). "Rundungsfehleranalyse einiger Verfahren zur Summation endlicher Summen."
 > *Zeitschrift für Angewandte Mathematik und Mechanik*, 54(1), 39–51.
 
 **Why this works:** Neumaier summation improves on Kahan summation by checking which operand has larger magnitude before computing the compensation term. This handles "catastrophic cancellation" cases where the value being added is larger than the running sum.
 
-The algorithm maintains a compensation buffer that captures precision lost during each addition. The final result (sum + compensation) recovers the lost bits, bounding total error to O(ε) regardless of operation count—compared to O(n × ε) for naive summation.
+The compensation buffer tracks rounding residuals from additions. The returned `sum + compensation` is more accurate than a naive sum for many finite input sequences. The rigorous error bound depends on scale (such as the sum of absolute input magnitudes), condition, the length of the sequence, and IEEE-754 assumptions; higher-order terms need not be independent of length.
 
 Drift Kernel implements this algorithm exactly as described in the literature. No novel variants or modifications are claimed.
 
 ## Cross-Platform Determinism
 
-**Observed behavior:** Identical results across Linux, Windows, and macOS for IEEE-754 binary64 operations under default rounding mode (round-to-nearest-even).
+**Scope:** Cross-platform bit identity is not guaranteed; equal results in a test matrix demonstrate only the tested targets and configuration.
 
 This is expected for pure floating-point arithmetic without platform-specific intrinsics. However, we explicitly disclaim bit-for-bit determinism guarantees across:
 - Different compiler versions or optimization levels
 - Non-default rounding modes
 - Extended precision intermediates (x87 FPU)
 
-CI validates cross-platform consistency for the test suite on every commit.
+CI executes per-platform suites; comparing hashes across runners requires an explicit shared fixture and artifact comparison.
 
 ## NorthStar Principle
 
